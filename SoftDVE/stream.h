@@ -3,6 +3,8 @@
 
 #include <windows.h>
 
+#define NUM_STREAMS 20
+
 typedef DWORD RGBA;
 
 typedef int (*PStream_OutputFrame)(void*);
@@ -19,5 +21,14 @@ typedef struct tagStream{
 	char* name;
     PStream_OutputFrame OutputFrame;
 } Stream, *PStream;
+
+typedef void (*StreamProc)(PStream);
+
+HBITMAP MakeDib(RGBA** pvBits);
+
+void EnumStreams(StreamProc callback);
+int get_slider_pos(HWND hwnd, int dlgItemID);
+
+extern PStream StreamList[NUM_STREAMS];
 
 #endif

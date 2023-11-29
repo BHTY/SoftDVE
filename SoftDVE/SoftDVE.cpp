@@ -2,10 +2,10 @@
 #include "stream.h"
 #include "resource.h"
 #include "solid.h"
+#include "fade.h"
 #include <stdlib.h>
 #include <mmsystem.h>
-
-#define NUM_STREAMS 20
+#include "bitmap.h"
 
 int global_ready = 0;
 HWND master_dlg = NULL;
@@ -42,8 +42,6 @@ When the program opens, a solid-color stream is created.
 
 Table to choose from of DVEs
 */
-
-typedef void (*StreamProc)(PStream);
 
 PStream StreamList[NUM_STREAMS];
 
@@ -91,6 +89,33 @@ LRESULT CALLBACK PreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 	HDC memDC;
 	int res;
 	RECT rect;
+	Stream* stream;
+
+	switch(msg){
+		case WM_PAINT:
+			stream = (Stream*)GetWindowLongPtrA(GetParent(hwnd), DWLP_USER);
+			GetWindowRect(hwnd, &rect);
+
+			if(stream){
+				hdc = BeginPaint(hwnd, &ps);
+				memDC = CreateCompatibleDC(hdc);
+				SelectObject(memDC, stream->hDib);
+				res = StretchBlt(hdc, 0, 0, rect.right - rect.left, rect.bottom - rect.top, memDC, 0, 0, 640, 480, SRCCOPY);
+				//printf("%d\n", res);
+				DeleteDC(memDC);
+				EndPaint(hwnd, &ps);
+			}
+		default:
+			return DefWindowProcA(hwnd, msg, wParam, lParam);
+	}
+}
+
+LRESULT CALLBACK MPreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
+	HDC hdc;
+	PAINTSTRUCT ps;
+	HDC memDC;
+	int res;
+	RECT rect;
 
 	switch(msg){
 		case WM_PAINT:
@@ -100,7 +125,7 @@ LRESULT CALLBACK PreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			hdc = BeginPaint(hwnd, &ps);
 			memDC = CreateCompatibleDC(hdc);
 			SelectObject(memDC, stream_selected->hDib);
-			res = StretchBlt(hdc, 0, 0, rect.right, rect.bottom, memDC, 0, 0, 640, 480, SRCCOPY);
+			res = StretchBlt(hdc, 0, 0, rect.right - rect.left, rect.bottom - rect.top, memDC, 0, 0, 640, 480, SRCCOPY);
 			//printf("%d\n", res);
 			DeleteDC(memDC);
 			EndPaint(hwnd, &ps);
@@ -108,6 +133,8 @@ LRESULT CALLBACK PreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 		default:
 			return DefWindowProcA(hwnd, msg, wParam, lParam);
 	}
+
+	return 0;
 }
 
 int AddStream(PStream pStream){
@@ -117,12 +144,20 @@ int AddStream(PStream pStream){
 		if(StreamList[i] == 0){
 			StreamList[i] = pStream;
 
-			if(master_dlg)SendDlgItemMessageA(master_dlg, IDC_COMBO3, CB_ADDSTRING, 0, (LPARAM)pStream->name);
+			if(master_dlg){
+				printf("Adding %s to list\n", pStream->name);
+				add_name(pStream);
+				//SendDlgItemMessageA(master_dlg, IDC_COMBO3, CB_ADDSTRING, 0, (LPARAM)pStream->name);
+			}
 
 			return 1;
 		}
 	}
 
+	return 0;
+}
+
+int FindStreamByName(char* name){
 	return 0;
 }
 
@@ -155,6 +190,12 @@ BOOL CALLBACK MasterDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			EndPaint(hwnd, &ps);  
 			return FALSE;
 		case WM_COMMAND:
+			if(LOWORD(wParam) == IDC_COMBO3 && HIWORD(wParam) == CBN_SELCHANGE){
+				i = SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_GETCURSEL, 0, 0);
+				printf("Switching input to %d! (%p)\n", i, SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_GETITEMDATA, i, 0));
+				stream_selected = StreamList[i];
+			}
+
 			return TRUE;
 		case WM_NOTIFY:
 			return TRUE;
@@ -165,6 +206,18 @@ BOOL CALLBACK MasterDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 
 void CreatePreviewClass(){
 	WNDCLASSA wc;
+	wc.style = 0;
+	wc.lpfnWndProc = (WNDPROC)MPreviewProc;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hInstance = GetModuleHandle(NULL);
+	wc.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1)); //101
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wc.lpszMenuName = NULL;
+	wc.lpszClassName = "MPREVIEW";
+	RegisterClassA(&wc);
+
 	wc.style = 0;
 	wc.lpfnWndProc = (WNDPROC)PreviewProc;
 	wc.cbClsExtra = 0;
@@ -225,6 +278,28 @@ int main(){
 	master_dlg = CreateMasterDialog();
 
 	printf("%p %d\n", master_dlg, GetLastError());
+
+	SolidColorStream* stream2 = SCC_OpenStream();
+	printf("%p %d\n", stream2, GetLastError());
+	stream2->stream.name = (char*)malloc(50);
+	sprintf(stream2->stream.name, "Solid Color Stream 1");
+
+	AddStream((PStream)stream2);
+
+	FadeStream* fs = FS_OpenStream();
+	printf("%p %d\n", fs, GetLastError());
+	fs->stream.name = (char*)malloc(50);
+	sprintf(fs->stream.name, "Fader Control 0");
+
+	AddStream((PStream)fs);
+
+	DIBStream* ds = DS_OpenStream();
+	printf("%p %d\n", ds, GetLastError());
+	if(ds){
+		ds->stream.name = (char*)malloc(50);
+		sprintf(ds->stream.name, "Bitmap Stream 0");
+		AddStream((PStream)ds);
+	}
 
 	MsgLoop(master_dlg);
 }
