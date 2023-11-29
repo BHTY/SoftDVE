@@ -39,8 +39,18 @@ void DS_LoadFile(HWND hwnd){
 	}
 }
 
+void DS_NegateImage(RGBTriplet* bits){
+	int i;
+
+	for(i = 0; i < 640 * 480; i++){
+		bits[i].r = 255 - bits[i].r;
+		bits[i].g = 255 - bits[i].g;
+		bits[i].b = 255 - bits[i].b;
+	}
+}
+
 BOOL CALLBACK DS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
-	DIBStream* stream;
+	DIBStream* stream = (DIBStream*)GetWindowLongPtrA(hwnd, DWLP_USER);
 
 	switch(msg){
 		case WM_INITDIALOG:
@@ -51,6 +61,9 @@ BOOL CALLBACK DS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 		case WM_COMMAND:
 			if(LOWORD(wParam) == IDC_BUTTON1){
 				DS_LoadFile(hwnd);
+			}
+			if(LOWORD(wParam) == IDC_CHECK1){
+				DS_NegateImage((RGBTriplet*)stream->stream.pBits);
 			}
 
 			return TRUE;
