@@ -57,6 +57,7 @@ BOOL CALLBACK DS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			SetWindowLongPtrA(hwnd, DWLP_USER, lParam);
 			return TRUE;
 		case WM_PAINT:
+			SetWindowTextA(hwnd, stream->stream.name);
 			return FALSE;
 		case WM_COMMAND:
 			if(LOWORD(wParam) == IDC_BUTTON1){

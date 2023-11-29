@@ -33,7 +33,7 @@ int FS_OutputFrame(FadeStream* pStream){
 }
 
 BOOL CALLBACK FS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
-	FadeStream* stream;
+	FadeStream* stream = (FadeStream*)GetWindowLongPtrA(hwnd, DWLP_USER);
 
 	switch(msg){
 		case WM_INITDIALOG:
@@ -46,12 +46,13 @@ BOOL CALLBACK FS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			SendDlgItemMessageA(hwnd, IDC_COMBO4, CB_SETCURSEL, lParam, 0);
 
 			((FadeStream*)(lParam))->child0 = StreamList[0];
-			((FadeStream*)(lParam))->child1 = StreamList[1];
+			((FadeStream*)(lParam))->child1 = StreamList[2];
 
 			sortHwnd = NULL;
 
 			return TRUE;
 		case WM_PAINT:
+			SetWindowTextA(hwnd, stream->stream.name);
 			//InvalidateRect(GetDlgItem(hwnd, IDC_CUSTOM1), NULL, TRUE);
 			return FALSE;
 		case WM_COMMAND:

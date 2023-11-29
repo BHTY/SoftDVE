@@ -286,13 +286,6 @@ int main(){
 
 	AddStream((PStream)stream2);
 
-	FadeStream* fs = FS_OpenStream();
-	printf("%p %d\n", fs, GetLastError());
-	fs->stream.name = (char*)malloc(50);
-	sprintf(fs->stream.name, "Fader Control 0");
-
-	AddStream((PStream)fs);
-
 	DIBStream* ds = DS_OpenStream();
 	printf("%p %d\n", ds, GetLastError());
 	if(ds){
@@ -300,6 +293,13 @@ int main(){
 		sprintf(ds->stream.name, "Bitmap Stream 0");
 		AddStream((PStream)ds);
 	}
+
+	FadeStream* fs = FS_OpenStream();
+	printf("%p %d\n", fs, GetLastError());
+	fs->stream.name = (char*)malloc(50);
+	sprintf(fs->stream.name, "Fader Control 0");
+
+	AddStream((PStream)fs);
 
 	MsgLoop(master_dlg);
 }
