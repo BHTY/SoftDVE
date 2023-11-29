@@ -21,6 +21,7 @@
 #define IDC_COMBO4                      1015
 #define IDC_BUTTON1                     1015
 #define IDC_CHECK1                      1016
+#define IDC_BUTTON2                     1017
 #define ID_HELP_ABOUT                   40001
 #define ID_STREAMS_ADDSTREAM            40002
 #define ID_STREAMS_REMOVESTREAM         40003
@@ -38,7 +39,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        107
 #define _APS_NEXT_COMMAND_VALUE         40011
-#define _APS_NEXT_CONTROL_VALUE         1017
+#define _APS_NEXT_CONTROL_VALUE         1018
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

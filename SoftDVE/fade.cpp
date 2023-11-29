@@ -7,6 +7,7 @@
 HWND sortHwnd = NULL;
 
 void FS_AddListEntries(PStream pStream){
+	printf("Adding item %s to fader\n", pStream->name);
 	SendDlgItemMessageA(sortHwnd, IDC_COMBO3, CB_ADDSTRING, 0, (LPARAM)pStream->name);
 	SendDlgItemMessageA(sortHwnd, IDC_COMBO4, CB_ADDSTRING, 0, (LPARAM)pStream->name);
 }
@@ -33,22 +34,35 @@ int FS_OutputFrame(FadeStream* pStream){
 }
 
 BOOL CALLBACK FS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
+	int i;
 	FadeStream* stream = (FadeStream*)GetWindowLongPtrA(hwnd, DWLP_USER);
 
 	switch(msg){
+		case WM_REFRESH_STREAMS:
+			printf("Refreshing streams!\n");
+			SendMessage(GetDlgItem(hwnd, IDC_COMBO3), CB_RESETCONTENT, 0, 0);
+			SendMessage(GetDlgItem(hwnd, IDC_COMBO4), CB_RESETCONTENT, 0, 0);
+			EnumStreams(FS_AddListEntries);
+			return FALSE;
+
+		case WM_DRAWITEM:
+			DrawPreview((PStream)stream, (PDRAWITEMSTRUCT)lParam);
+			return TRUE;
 		case WM_INITDIALOG:
+			SetWindowLongPtrA(hwnd, DWLP_USER, lParam);
+
 			sortHwnd = hwnd;
 
+			printf("Initializing dialog\n");
 			EnumStreams(FS_AddListEntries);
-			SetWindowLongPtrA(hwnd, DWLP_USER, lParam);
 			
 			SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_SETCURSEL, lParam, 0);
 			SendDlgItemMessageA(hwnd, IDC_COMBO4, CB_SETCURSEL, lParam, 0);
 
 			((FadeStream*)(lParam))->child0 = StreamList[0];
-			((FadeStream*)(lParam))->child1 = StreamList[2];
+			((FadeStream*)(lParam))->child1 = StreamList[1];
 
-			sortHwnd = NULL;
+			//sortHwnd = NULL;
 
 			return TRUE;
 		case WM_PAINT:
@@ -56,6 +70,18 @@ BOOL CALLBACK FS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			//InvalidateRect(GetDlgItem(hwnd, IDC_CUSTOM1), NULL, TRUE);
 			return FALSE;
 		case WM_COMMAND:
+			if(LOWORD(wParam) == IDC_COMBO3 && HIWORD(wParam) == CBN_SELCHANGE){
+				i = SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_GETCURSEL, 0, 0);
+				printf("Switching A bus to %d! (%p)\n", i, SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_GETITEMDATA, i, 0));
+				if((void*)stream != (void*)StreamList[i]) stream->child0 = StreamList[i];
+			}
+
+			if(LOWORD(wParam) == IDC_COMBO4 && HIWORD(wParam) == CBN_SELCHANGE){
+				i = SendDlgItemMessageA(hwnd, IDC_COMBO4, CB_GETCURSEL, 0, 0);
+				printf("Switching B bus to %d! (%p)\n", i, SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_GETITEMDATA, i, 0));
+				if((void*)stream != (void*)StreamList[i]) stream->child1 = StreamList[i];
+			}
+
 			return TRUE;
 		case WM_NOTIFY:
 			stream = (FadeStream*)GetWindowLongPtrA(hwnd, DWLP_USER);

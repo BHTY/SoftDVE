@@ -9,6 +9,5 @@ typedef struct tagSolidColorStream{
 } SolidColorStream;
 
 SolidColorStream* SCC_OpenStream();
-void SCC_Init();
 
 #endif

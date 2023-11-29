@@ -3,7 +3,34 @@
 #include <stdio.h>
 #include <commdlg.h>
 
+void DS_NegateImage(RGBTriplet* bits){
+	int i;
+
+	for(i = 0; i < 640 * 480; i++){
+		bits[i].r = 255 - bits[i].r;
+		bits[i].g = 255 - bits[i].g;
+		bits[i].b = 255 - bits[i].b;
+	}
+}
+
 int DS_OutputFrame(DIBStream* pStream){
+	HDC memDC, physDC;
+	HWND hwnd = FindWindowA(NULL, "DS9 Season 1 Episode 3 Past Prologue.m4v - VLC media player");
+	RECT rect;
+
+	if(hwnd){
+		GetWindowRect(hwnd, &rect);
+
+		physDC = GetDC(hwnd);
+		memDC = CreateCompatibleDC(GetDC(NULL));
+		SelectObject(memDC, pStream->stream.hDib);
+		//BitBlt(memDC, 0, 0, 640, 480, physDC, 0, 0, SRCCOPY);
+		StretchBlt(memDC, 0, 0, 640, 480, physDC, 0, 0, rect.right - rect.left, rect.bottom - rect.top, SRCCOPY);
+		DeleteDC(memDC);
+		ReleaseDC(hwnd, physDC);
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -39,16 +66,6 @@ void DS_LoadFile(HWND hwnd){
 	}
 }
 
-void DS_NegateImage(RGBTriplet* bits){
-	int i;
-
-	for(i = 0; i < 640 * 480; i++){
-		bits[i].r = 255 - bits[i].r;
-		bits[i].g = 255 - bits[i].g;
-		bits[i].b = 255 - bits[i].b;
-	}
-}
-
 BOOL CALLBACK DS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 	DIBStream* stream = (DIBStream*)GetWindowLongPtrA(hwnd, DWLP_USER);
 
@@ -59,6 +76,9 @@ BOOL CALLBACK DS_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 		case WM_PAINT:
 			SetWindowTextA(hwnd, stream->stream.name);
 			return FALSE;
+		case WM_DRAWITEM:
+			DrawPreview((PStream)stream, (PDRAWITEMSTRUCT)lParam);
+			return TRUE;
 		case WM_COMMAND:
 			if(LOWORD(wParam) == IDC_BUTTON1){
 				DS_LoadFile(hwnd);

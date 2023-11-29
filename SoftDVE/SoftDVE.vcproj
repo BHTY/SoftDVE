@@ -181,6 +181,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\key.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\old.c"
 				>
 			</File>
@@ -204,6 +208,10 @@
 			</File>
 			<File
 				RelativePath=".\fade.h"
+				>
+			</File>
+			<File
+				RelativePath=".\key.h"
 				>
 			</File>
 			<File

@@ -3,6 +3,8 @@
 
 #include <windows.h>
 
+#define WM_REFRESH_STREAMS WM_USER
+
 #define NUM_STREAMS 20
 
 typedef DWORD RGBA;
@@ -23,8 +25,10 @@ typedef struct tagStream{
 } Stream, *PStream;
 
 typedef void (*StreamProc)(PStream);
+typedef PStream (*POpenStream)();
 
 HBITMAP MakeDib(RGBA** pvBits);
+void DrawPreview(PStream stream, PDRAWITEMSTRUCT pDis);
 
 void EnumStreams(StreamProc callback);
 int get_slider_pos(HWND hwnd, int dlgItemID);

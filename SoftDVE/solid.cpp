@@ -43,9 +43,30 @@ void sync_with_sliders(HWND hwnd){
 }
 
 BOOL CALLBACK SCC_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
+	SolidColorStream* stream;
+	DRAWITEMSTRUCT* pDis;
+	RECT rect;
+	HBRUSH brush;
+
 	switch(msg){
 		case WM_INITDIALOG:
 			SetWindowLongPtrA(hwnd, DWLP_USER, lParam);
+			return TRUE;
+		case WM_DRAWITEM:
+			stream = (SolidColorStream*)GetWindowLongPtrA(hwnd, DWLP_USER);
+			pDis = (DRAWITEMSTRUCT*)lParam;
+
+			rect.bottom = 0;
+			rect.top = 200;
+			rect.left = 0;
+			rect.right = 100;
+
+			brush = CreateSolidBrush(RGB(stream->color.r, stream->color.g, stream->color.b));
+
+			FillRect(pDis->hDC, &rect, brush);
+
+			DeleteObject(brush);
+
 			return TRUE;
 		case WM_PAINT:
 			RedrawDialog(hwnd);
@@ -59,33 +80,6 @@ BOOL CALLBACK SCC_DlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 			return TRUE;
 		default:
 			return FALSE;
-	}
-}
-
-LRESULT CALLBACK SCC_PreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
-	SolidColorStream* stream;
-	PAINTSTRUCT ps;
-	HDC hdc;
-	HBRUSH brush;
-	RECT rect;
-
-	switch(msg){
-		case WM_PAINT:
-			stream = (SolidColorStream*)GetWindowLongPtrA(GetParent(hwnd), DWLP_USER);
-
-			rect.bottom = 0;
-			rect.top = 200;
-			rect.left = 0;
-			rect.right = 100;
-
-			hdc = BeginPaint(hwnd, &ps);
-			brush = CreateSolidBrush(RGB(stream->color.r, stream->color.g, stream->color.b));
-			FillRect(hdc, &rect, brush);
-			DeleteObject(brush);
-			EndPaint(hwnd, &ps);
-			break;
-		default:
-			return DefWindowProc(hwnd, msg, wParam, lParam);
 	}
 }
 
@@ -133,19 +127,4 @@ SolidColorStream* SCC_OpenStream(){
 	ShowWindow(stream->stream.hwnd, SW_SHOW);
 
 	return stream;
-}
-
-void SCC_Init(){
-	WNDCLASSA wc;
-	wc.style = 0;
-	wc.lpfnWndProc = (WNDPROC)SCC_PreviewProc;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hInstance = GetModuleHandle(NULL);
-	wc.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1)); //101
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wc.lpszMenuName = NULL;
-	wc.lpszClassName = "COLORPREVIEW";
-	RegisterClassA(&wc);
 }

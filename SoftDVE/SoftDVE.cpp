@@ -6,45 +6,11 @@
 #include <stdlib.h>
 #include <mmsystem.h>
 #include "bitmap.h"
+#include "key.h"
 
-int global_ready = 0;
 HWND master_dlg = NULL;
 
-/*
-	Application "Topology"
-Everything begins from the main window where you select the Output Stream. It has a preview. There is also a menu with
-additional options.
-
-
-OUTPUT				STREAMS									HELP
-Set Framerate		Add Stream>		Stream types...			About
-Exit				Remove Stream>	List of streams...
-					Load DVE
-
-
-Let's say you're creating a solid color stream. The "add stream" thing will call DLL!OpenStream to create a new stream
-object. The operations performed are
-1.) Allocate a SolidColorStream, set all fields to 0
-2.) Set OutputFrame to the DLL's OutputFrame function
-3.) Call CreateDIBSection to get an HBITMAP and a pointer to bits to stuff into the Stream header
-4.) Create a dialog box using the HMODULE of the DLL, appropriate dialog ID and dialog procedure
-
-The program maintains a list of open streams; the new stream is appended to that list.
-
-The output framerate is used to set a timer interval. Every time the timer goes off, this initiates a rendering process.
-
-We enumerate over all streams twice. The first time, we set a flag to invalidate the current bits. Then, for every 
-stream, if it is invalidated, call OutputFrame and then InvalidateRect its dialog HWND. 
-
-
-When the program opens, a solid-color stream is created.
-
-
-Table to choose from of DVEs
-*/
-
 PStream StreamList[NUM_STREAMS];
-
 PStream stream_selected = NULL;
 
 void EnumStreams(StreamProc callback){
@@ -65,7 +31,11 @@ void OutputStream(PStream pStream){
 	//if it's invalidated, call outputframe
 	if(!pStream->valid){
 		pStream->OutputFrame(pStream);
-		InvalidateRect(pStream->hwnd, NULL, 0);
+		//InvalidateRect(pStream->hwnd, NULL, 0);
+		
+		//SendMessage(pStream->hwnd, WM_PAINT, 0, 0);
+		InvalidateRect(FindWindowExA(pStream->hwnd, NULL, "STATIC", NULL), NULL, 0);
+		
 		pStream->valid = 1;
 		//printf("Doing invalidate rect!\n");
 	}
@@ -75,66 +45,16 @@ void DoRender(){
 	//printf("Rendering!\n");
 	EnumStreams(InvalidateBits);
 	EnumStreams(OutputStream);
-//	InvalidateRect(master_dlg, NULL, 0);
-	SendMessage(master_dlg, WM_PAINT, 0, 0);
+	//InvalidateRect(master_dlg, NULL, 0);
+	//SendMessage(master_dlg, WM_PAINT, 0, 0);
+	//InvalidateRect(FindWindowExA(master_dlg, NULL, "STATIC", NULL), NULL, 0);
+	InvalidateRect(GetDlgItem(master_dlg, IDC_CUSTOM1), NULL, 0);
 }
+
+
 
 void add_name(PStream pStream){
 	SendDlgItemMessageA(master_dlg, IDC_COMBO3, CB_ADDSTRING, 0, (LPARAM)pStream->name);
-}
-
-LRESULT CALLBACK PreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
-	HDC hdc;
-	PAINTSTRUCT ps;
-	HDC memDC;
-	int res;
-	RECT rect;
-	Stream* stream;
-
-	switch(msg){
-		case WM_PAINT:
-			stream = (Stream*)GetWindowLongPtrA(GetParent(hwnd), DWLP_USER);
-			GetWindowRect(hwnd, &rect);
-
-			if(stream){
-				hdc = BeginPaint(hwnd, &ps);
-				memDC = CreateCompatibleDC(hdc);
-				SelectObject(memDC, stream->hDib);
-				res = StretchBlt(hdc, 0, 0, rect.right - rect.left, rect.bottom - rect.top, memDC, 0, 0, 640, 480, SRCCOPY);
-				//printf("%d\n", res);
-				DeleteDC(memDC);
-				EndPaint(hwnd, &ps);
-			}
-		default:
-			return DefWindowProcA(hwnd, msg, wParam, lParam);
-	}
-}
-
-LRESULT CALLBACK MPreviewProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
-	HDC hdc;
-	PAINTSTRUCT ps;
-	HDC memDC;
-	int res;
-	RECT rect;
-
-	switch(msg){
-		case WM_PAINT:
-			GetWindowRect(hwnd, &rect);
-
-			//printf("Preview paint message!\n");
-			hdc = BeginPaint(hwnd, &ps);
-			memDC = CreateCompatibleDC(hdc);
-			SelectObject(memDC, stream_selected->hDib);
-			res = StretchBlt(hdc, 0, 0, rect.right - rect.left, rect.bottom - rect.top, memDC, 0, 0, 640, 480, SRCCOPY);
-			//printf("%d\n", res);
-			DeleteDC(memDC);
-			EndPaint(hwnd, &ps);
-			break;
-		default:
-			return DefWindowProcA(hwnd, msg, wParam, lParam);
-	}
-
-	return 0;
 }
 
 int AddStream(PStream pStream){
@@ -147,6 +67,7 @@ int AddStream(PStream pStream){
 			if(master_dlg){
 				printf("Adding %s to list\n", pStream->name);
 				add_name(pStream);
+				SendMessage(HWND_BROADCAST, WM_REFRESH_STREAMS, 0, 0);
 				//SendDlgItemMessageA(master_dlg, IDC_COMBO3, CB_ADDSTRING, 0, (LPARAM)pStream->name);
 			}
 
@@ -157,37 +78,75 @@ int AddStream(PStream pStream){
 	return 0;
 }
 
-int FindStreamByName(char* name){
-	return 0;
+void DrawPreview(PStream stream, PDRAWITEMSTRUCT pDis){
+	RECT rect;
+	HDC memDC = CreateCompatibleDC(GetDC(NULL));
+	SelectObject(memDC, stream->hDib);
+	GetWindowRect(pDis->hwndItem, &rect);
+	StretchBlt(pDis->hDC, 0, 0, rect.right - rect.left, rect.bottom - rect.top, memDC, 0, 0, 640, 480, SRCCOPY);
+	DeleteDC(memDC);
 }
 
-void CALLBACK mmproc(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2){
-	global_ready = 1;
+typedef struct tagStreamOpenStruct{
+	char* title;
+	POpenStream OpenStream;
+	int done;
+} StreamOpenStruct, *PStreamOpenStruct;
+
+DWORD WINAPI StreamMsgLoop(PStreamOpenStruct pSOS){
+	MSG msg;
+	PStream stream = pSOS->OpenStream();
+	stream->name = pSOS->title;
+
+	printf("%p %p %d\n", stream, stream->hwnd, GetLastError());
+
+	pSOS->done = 1;
+
+	if(stream_selected == NULL){ //this is the first stream!
+		stream_selected = stream;
+	}
+
+	AddStream(stream);
+
+	while(1){
+		if(PeekMessageA(&msg, stream->hwnd, 0, 0, PM_REMOVE)){
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+	}
+}
+
+HANDLE OpenStream(PStreamOpenStruct pSOS){
+	HANDLE handle;
+	pSOS->done = 0;
+	handle = CreateThread(NULL, 0x10000, (LPTHREAD_START_ROUTINE)StreamMsgLoop, pSOS, 0, NULL);
+	return handle;
 }
 
 BOOL CALLBACK MasterDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 	HMENU hMenu;
-	PAINTSTRUCT ps;
 	int i;
 
-	//printf("Stuff IS happening here...\n");
-
 	switch(msg){
+		case WM_DRAWITEM:
+			
+			if(stream_selected){
+				DrawPreview(stream_selected, (PDRAWITEMSTRUCT)lParam);
+			}
+
+			return FALSE;
+
 		case WM_INITDIALOG:
 			master_dlg = hwnd;
-			EnumStreams(add_name);	
 
-			SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_SETCURSEL, lParam, 0);
 			hMenu = LoadMenuA(GetModuleHandle(NULL), (LPCSTR)IDR_MENU1);
 			SetMenu(hwnd, hMenu);
-			global_ready = 1;
-			timeSetEvent(17, 0, mmproc, 0, TIME_PERIODIC);
+
+			SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_SETCURSEL, lParam, 0);
+			
 			return TRUE;
 		case WM_PAINT:
-			//printf("Master WM_Paint message!\n");
-			BeginPaint(hwnd, &ps);
-			InvalidateRect(GetDlgItem(hwnd, IDC_CUSTOM1), NULL, TRUE);
-			EndPaint(hwnd, &ps);  
+
 			return FALSE;
 		case WM_COMMAND:
 			if(LOWORD(wParam) == IDC_COMBO3 && HIWORD(wParam) == CBN_SELCHANGE){
@@ -195,6 +154,7 @@ BOOL CALLBACK MasterDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 				printf("Switching input to %d! (%p)\n", i, SendDlgItemMessageA(hwnd, IDC_COMBO3, CB_GETITEMDATA, i, 0));
 				stream_selected = StreamList[i];
 			}
+
 
 			return TRUE;
 		case WM_NOTIFY:
@@ -204,102 +164,80 @@ BOOL CALLBACK MasterDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 	}
 }
 
-void CreatePreviewClass(){
-	WNDCLASSA wc;
-	wc.style = 0;
-	wc.lpfnWndProc = (WNDPROC)MPreviewProc;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hInstance = GetModuleHandle(NULL);
-	wc.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1)); //101
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wc.lpszMenuName = NULL;
-	wc.lpszClassName = "MPREVIEW";
-	RegisterClassA(&wc);
-
-	wc.style = 0;
-	wc.lpfnWndProc = (WNDPROC)PreviewProc;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hInstance = GetModuleHandle(NULL);
-	wc.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1)); //101
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
-	wc.lpszMenuName = NULL;
-	wc.lpszClassName = "PREVIEW";
-	RegisterClassA(&wc);
-}
-
 HWND CreateMasterDialog(){
 	HWND hwnd = CreateDialogParamA(GetModuleHandle(NULL), (LPCSTR)IDD_DIALOG2, NULL, MasterDlgProc, (LPARAM)0);
 	ShowWindow(hwnd, SW_SHOW);
 	return hwnd;
 }
 
-void MsgLoop(HWND hwnd){
+DWORD WINAPI MasterMsgLoop(LPVOID lpParam){
 	MSG msg;
-
-	while(1){
-		if(GetMessage(&msg, NULL, 0, 0)){
-			//if(!IsDialogMessage(hwnd, &msg)){
-				TranslateMessage(&msg);
-				DispatchMessage(&msg);
-			//}
-		}
-
-		if(global_ready){
-			DoRender();
-			global_ready = 0;
-		}
-	}
-}
-
-void SoftDVE_Init(){
-	CreatePreviewClass();
-	SCC_Init();
-	memset(StreamList, 0, sizeof(StreamList));
-
-	timeBeginPeriod(1);
-}
-
-int main(){	
-	SoftDVE_Init();
-
-	SolidColorStream* stream = SCC_OpenStream();
-	printf("%p %d\n", stream, GetLastError());
-	stream->stream.name = (char*)malloc(50);
-	sprintf(stream->stream.name, "Solid Color Stream 0");
-
-	stream_selected = (PStream)stream;
-
-	AddStream((PStream)stream);
 
 	master_dlg = CreateMasterDialog();
 
 	printf("%p %d\n", master_dlg, GetLastError());
 
-	SolidColorStream* stream2 = SCC_OpenStream();
-	printf("%p %d\n", stream2, GetLastError());
-	stream2->stream.name = (char*)malloc(50);
-	sprintf(stream2->stream.name, "Solid Color Stream 1");
+	while(1){
+		if(PeekMessageA(&msg, master_dlg, 0, 0, PM_REMOVE)){
+			//if(!IsDialogMessageA(master_dlg, &msg)){
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			//}
+		}
+	}
+}
 
-	AddStream((PStream)stream2);
 
-	DIBStream* ds = DS_OpenStream();
-	printf("%p %d\n", ds, GetLastError());
-	if(ds){
-		ds->stream.name = (char*)malloc(50);
-		sprintf(ds->stream.name, "Bitmap Stream 0");
-		AddStream((PStream)ds);
+void SoftDVE_Init(){
+	memset(StreamList, 0, sizeof(StreamList));
+	timeBeginPeriod(1);
+	CreateThread(NULL, 0x10000, (LPTHREAD_START_ROUTINE)MasterMsgLoop, NULL, 0, NULL);
+}
+
+
+void print_stream(PStream stream){
+	printf("Stream Name: %s\n", stream->name);
+}
+
+
+int main(){
+	SoftDVE_Init();
+
+	StreamOpenStruct sos, sos2, sos3, sos4;
+
+	sos.title = "Solid Color Stream 0";
+	sos.OpenStream = (POpenStream)SCC_OpenStream;
+
+	OpenStream(&sos);
+
+	sos2.title = "Bitmap Stream 0";
+	sos2.OpenStream = (POpenStream)DS_OpenStream;
+
+	OpenStream(&sos2);
+
+	sos3.title = "Fade Control 0";
+	sos3.OpenStream = (POpenStream)FS_OpenStream;
+
+	OpenStream(&sos3);
+
+	sos4.title = "Chroma Key 0";
+	sos4.OpenStream = (POpenStream)CK_OpenStream;
+
+	OpenStream(&sos4);
+
+	while(1){
+		printf("%d %d %d %d\n", sos.done, sos2.done, sos3.done, sos4.done);
+		if(sos.done || sos2.done || sos3.done, sos4.done){
+			break;
+		}
 	}
 
-	FadeStream* fs = FS_OpenStream();
-	printf("%p %d\n", fs, GetLastError());
-	fs->stream.name = (char*)malloc(50);
-	sprintf(fs->stream.name, "Fader Control 0");
+	printf("About to print streams\n");
+	EnumStreams(print_stream);
+	printf("Done printing\n");
 
-	AddStream((PStream)fs);
-
-	MsgLoop(master_dlg);
+	while(1){
+		DoRender();
+		Sleep(10);
+	}
 }

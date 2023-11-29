@@ -11,4 +11,6 @@ typedef struct tagChromaKeyStream{
     int max_distance;
 } ChromaKeyStream;
 
+ChromaKeyStream* CK_OpenStream();
+
 #endif
