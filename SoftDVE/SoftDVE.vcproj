@@ -48,6 +48,7 @@
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
 				DebugInformationFormat="4"
+				CompileAs="1"
 			/>
 			<Tool
 				Name="VCManagedResourceCompilerTool"
@@ -173,27 +174,11 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
-				RelativePath=".\bitmap.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\fade.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\key.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\old.c"
-				>
-			</File>
-			<File
 				RelativePath=".\SoftDVE.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\solid.cpp"
+				RelativePath=".\stream.cpp"
 				>
 			</File>
 		</Filter>
@@ -203,23 +188,11 @@
 			UniqueIdentifier="{93995380-89BD-4b04-88EB-625FBE52EBFB}"
 			>
 			<File
-				RelativePath=".\bitmap.h"
-				>
-			</File>
-			<File
-				RelativePath=".\fade.h"
-				>
-			</File>
-			<File
-				RelativePath=".\key.h"
+				RelativePath=".\dlg.h"
 				>
 			</File>
 			<File
 				RelativePath=".\resource.h"
-				>
-			</File>
-			<File
-				RelativePath=".\solid.h"
 				>
 			</File>
 			<File

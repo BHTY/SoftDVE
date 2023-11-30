@@ -3,35 +3,36 @@
 
 #include <windows.h>
 
-#define WM_REFRESH_STREAMS WM_USER
-
 #define NUM_STREAMS 20
 
 typedef DWORD RGBA;
 
-typedef int (*PStream_OutputFrame)(void*);
+typedef int (*PStream_OutputFrame)(struct tagStream*);
+typedef int (*PStream_ProcCmd)(struct tagStream*, int, LPARAM);
 
 typedef struct tagRGBTriplet{
-    BYTE b, g, r, a;
+	BYTE b, g, r, a;
 } RGBTriplet;
 
 typedef struct tagStream{
-    HWND hwnd;
 	HBITMAP hDib;
 	RGBA* pBits;
-	int valid;
-	char* name;
-    PStream_OutputFrame OutputFrame;
+	BOOL valid;
+	PStream_OutputFrame OutputFrame;
+	PStream_ProcCmd ProcCmd;
 } Stream, *PStream;
 
 typedef void (*StreamProc)(PStream);
-typedef PStream (*POpenStream)();
+
+PStream CreateStream(int sz, PStream_OutputFrame pFnFrame, PStream_ProcCmd pFnCmd);
 
 HBITMAP MakeDib(RGBA** pvBits);
-void DrawPreview(PStream stream, PDRAWITEMSTRUCT pDis);
-
+void DrawPreview(PStream stream, PDRAWITEMSTRUCT pDIS);
 void EnumStreams(StreamProc callback);
-int get_slider_pos(HWND hwnd, int dlgItemID);
+
+void OutputFrame(PStream stream);
+
+void DoRender();
 
 extern PStream StreamList[NUM_STREAMS];
 
