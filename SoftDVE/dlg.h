@@ -21,7 +21,9 @@ typedef struct tagDlgState{
 typedef void (*DlgEnumerator)(DlgState*);
 
 DlgState* FindControlByHwnd(DlgState* root, HWND hwnd);
+DlgState* FindControlById(DlgState* root, int id);
 void AddControlItem(DlgState* root, HWND hwnd, int id, int type, int callback);
 void EnumDlgControls(DlgState* root, DlgEnumerator callback);
+void RepaintPreviews(DlgState* pDLG);
 
 #endif

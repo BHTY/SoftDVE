@@ -2,15 +2,36 @@
 #include <windows.h>
 #include <commctrl.h>
 #include "dlg.h"
+#include "solid.h"
+#include "bitmap.h"
+#include "gdicap.h"
+#include <mmsystem.h>
+
+BOOL CALLBACK drawProc(HWND hwnd, DlgState* pDLG){
+	DRAWITEMSTRUCT dis;
+	DlgState* pDlgItem;
+
+	pDlgItem = FindControlByHwnd(pDLG, hwnd);
+
+	if(pDlgItem && pDlgItem->type == DLG_IMAGE && pDlgItem->stream){
+		dis.hDC = GetDC(hwnd);
+		dis.hwndItem = hwnd;
+
+		DrawPreview(pDlgItem->stream, &dis);
+
+		ReleaseDC(hwnd, dis.hDC);
+	}
+}
 
 LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
 	DlgState* pDLG = GetWindowLongPtrA(hwnd, 0);
 	DlgState* pDlgItem;
 	NMHDR* pNmhdr;
-	LPDRAWITEMSTRUCT pDIS;
+	LPDRAWITEMSTRUCT pDIS = lParam;
 	HBRUSH brush;
 	RECT rect;
 	HDC hdc;
+	PAINTSTRUCT ps;
 	LPCREATESTRUCTA pCS;
 
 	switch(msg){
@@ -21,14 +42,24 @@ LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			return DefWindowProcA(hwnd, msg, wParam, lParam);
 
 		case WM_DRAWITEM:
-			rect.bottom = 800;
-			rect.top = 0;
-			rect.right = 800;
-			rect.left = 0;
-			pDIS = lParam;
-			brush = CreateSolidBrush(0);
-			FillRect(pDIS->hDC, &rect, brush);
-			DeleteObject(brush);
+			EnumChildWindows(hwnd, drawProc, pDLG);
+			/*pDlgItem = FindControlByHwnd(pDLG, pDIS->hwndItem);
+
+			if(pDlgItem){
+				printf("Owner drawing control %d!\n", pDlgItem->id);
+
+				if(pDlgItem->stream){
+					DrawPreview(pDlgItem->stream, pDIS);
+				} else{
+					rect.bottom = 800;
+					rect.top = 0;
+					rect.right = 800;
+					rect.left = 0;
+					brush = CreateSolidBrush(0);
+					FillRect(pDIS->hDC, &rect, brush);
+					DeleteObject(brush);
+				}
+			}*/
 			break;
 
 		case WM_COMMAND:
@@ -51,6 +82,11 @@ LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			break;
 
 		case WM_PAINT:
+			BeginPaint(hwnd, &ps);
+			//EnumChildWindows(hwnd, drawProc, pDLG);
+			EndPaint(hwnd, &ps);
+			break;
+
 		default:
 			return DefWindowProcA(hwnd, msg, wParam, lParam);
 	}
@@ -164,6 +200,8 @@ HWND LoadDialog(FILE* fp){
 	int inside_group = 0;
 	int just_started_group = 0;
 
+	memset(pDLG, 0, sizeof(DlgState));
+
 	while(!eof){
 		res = fscanf(fp, "%s", lineHeader);
 		if(res == -1){eof = -1; break;}
@@ -237,7 +275,34 @@ void SoftDVEInit(){
 	InitDlgClass();
 }
 
+int global_ready = 0;
+
+void CALLBACK mmproc(UINT uTimerID, UINT uMsg, DWORD_PTR dwUser, DWORD_PTR dw1, DWORD_PTR dw2){
+	global_ready = 1;
+}
+
+DWORD WINAPI RenderThread(HWND hwnd){
+	while(1){
+		if(global_ready){
+			global_ready = 0;
+			DoRender(hwnd);
+		}
+	}
+}
+
+void StartRenderThread(HWND hwnd){
+	timeBeginPeriod(1);
+	timeSetEvent(33, 0, mmproc, 0, TIME_PERIODIC);
+	CreateThread(NULL, 0x10000, RenderThread, hwnd, 0, NULL);
+}
+
 int main(){
+	SolidColorStream* matte;
+	DIBStream* bitmap;
+	GDIStream* gdicap;
+
+	DlgState* pDLG;
+
 	MSG msg;
 	HWND hwnd;
 	FILE* fp;
@@ -250,7 +315,22 @@ int main(){
 
 	printf("HWND returned %p\n", hwnd);
 
+	matte = SCC_OpenStream(RGB(0x00, 0xFF, 0x00));
+	bitmap = DS_OpenStream("c:\\users\\will\\downloads\\star2.bmp");
+	gdicap = GS_OpenStream("DS9 Season 1 Episode 3 Past Prologue.m4v - VLC media player");
+
+	pDLG = GetWindowLongPtrA(hwnd, 0);
+	FindControlById(pDLG, 13)->stream = gdicap;
+	FindControlById(pDLG, 15)->stream = gdicap;
+	FindControlById(pDLG, 17)->stream = gdicap;
+	FindControlById(pDLG, 19)->stream = matte;
+	FindControlById(pDLG, 21)->stream = bitmap;
+
+	//StartRenderThread(hwnd);
+
 	while(1){
+		DoRender(hwnd);
+
 		if(GetMessage(&msg, hwnd, 0, 0)){
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);

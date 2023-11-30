@@ -16,6 +16,22 @@ DlgState* FindControlByHwnd(DlgState* root, HWND hwnd){
 	return NULL;
 }
 
+DlgState* FindControlById(DlgState* root, int id){
+	DlgState* cur;
+
+	if(root == NULL || root->next == NULL) return NULL;
+
+	cur = root->next;
+
+	while(cur){
+		if(cur->id == id) return cur;
+
+		cur = cur->next;
+	}
+
+	return NULL;
+}
+
 void AddControlItem(DlgState* root, HWND hwnd, int id, int type, int callback){
 	DlgState* old_next = root->next;
 	root->next = malloc(sizeof(DlgState));

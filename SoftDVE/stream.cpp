@@ -40,6 +40,7 @@ void OutputFrame(PStream stream){
 
 void RepaintPreviews(DlgState* pDLG){
 	if(pDLG->type == DLG_IMAGE){
+		//printf("Invalidating control %d\n", pDLG->id);
 		InvalidateRect(pDLG->hwnd, NULL, 0);
 	}
 }
@@ -55,6 +56,7 @@ void DrawPreview(PStream stream, PDRAWITEMSTRUCT pDIS){
 	HDC memDC = CreateCompatibleDC(GetDC(NULL));
 	SelectObject(memDC, stream->hDib);
 	GetWindowRect(pDIS->hwndItem, &rect);
+
 	StretchBlt(pDIS->hDC, 0, 0, rect.right - rect.left, rect.bottom - rect.top, memDC, 0, 0, 640, 480, SRCCOPY);
 	DeleteDC(memDC);
 }
