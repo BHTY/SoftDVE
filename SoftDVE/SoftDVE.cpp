@@ -4,12 +4,22 @@
 #include "dlg.h"
 
 LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam){
+	DlgState* pDLG = GetWindowLongPtrA(hwnd, 0);
+	DlgState* pDlgItem;
+	NMHDR* pNmhdr;
 	LPDRAWITEMSTRUCT pDIS;
 	HBRUSH brush;
 	RECT rect;
 	HDC hdc;
+	LPCREATESTRUCTA pCS;
 
 	switch(msg){
+
+		case WM_CREATE:
+			pCS = lParam;
+			SetWindowLongPtrA(hwnd, 0, pCS->lpCreateParams);
+			return DefWindowProcA(hwnd, msg, wParam, lParam);
+
 		case WM_DRAWITEM:
 			rect.bottom = 800;
 			rect.top = 0;
@@ -22,11 +32,22 @@ LRESULT CALLBACK DialogWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam
 			break;
 
 		case WM_COMMAND:
-			printf("Button click!\n");
+			pDlgItem = FindControlByHwnd(pDLG, lParam);
+			
+			if(pDlgItem){
+				printf("CTRL %d: Button Clicked!\n", pDlgItem->id);
+			}
+
 			break;
 
 		case WM_NOTIFY:
-			printf("Slider is moving!\n");
+			pNmhdr = lParam;
+			pDlgItem = FindControlByHwnd(pDLG, pNmhdr->hwndFrom);
+
+			if(pDlgItem){
+				printf("CTRL %d: Slider moved to %d!\n", pDlgItem->id, SendMessage(pDlgItem->hwnd, TBM_GETPOS, 0, 0));
+			}
+			
 			break;
 
 		case WM_PAINT:
@@ -91,28 +112,40 @@ typedef struct tagImageCreateStruct{
 } ImageCreateStruct;
 
 void AddTextControl(HWND hwnd, TextCreateStruct* tcs){
-	CreateWindowA("STATIC", tcs->caption, WS_CHILD | WS_VISIBLE | WS_GROUP, tcs->x, tcs->y, tcs->sx, tcs->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	HWND hctrl = CreateWindowA("STATIC", tcs->caption, WS_CHILD | WS_VISIBLE | WS_GROUP, tcs->x, tcs->y, tcs->sx, tcs->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	DlgState* pDLG = GetWindowLongPtrA(hwnd, 0);
+	AddControlItem(pDLG, hctrl, tcs->id, DLG_TEXT, NULL);
 }
 
 void AddButtonControl(HWND hwnd, ButtonCreateStruct* bcs, int group){
 	int grouping = 0;
+	HWND hctrl;
+	DlgState* pDLG = GetWindowLongPtrA(hwnd, 0);
 
 	if(group) grouping = WS_GROUP | WS_TABSTOP;
 
-	CreateWindowA("BUTTON", bcs->caption, WS_VISIBLE | WS_CHILD | bcs->style | grouping, bcs->x, bcs->y, bcs->sx, bcs->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	hctrl = CreateWindowA("BUTTON", bcs->caption, WS_VISIBLE | WS_CHILD | bcs->style | grouping, bcs->x, bcs->y, bcs->sx, bcs->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	AddControlItem(pDLG, hctrl, bcs->id, DLG_BUTTON, NULL);
 }
 
 void AddImageControl(HWND hwnd, ImageCreateStruct* ics){
-	CreateWindowA("STATIC", NULL, WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, ics->x, ics->y, ics->sx, ics->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	DlgState* pDLG = GetWindowLongPtrA(hwnd, 0);
+	HWND hctrl = CreateWindowA("STATIC", NULL, WS_CHILD | WS_VISIBLE | SS_OWNERDRAW, ics->x, ics->y, ics->sx, ics->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	AddControlItem(pDLG, hctrl, ics->id, DLG_IMAGE, NULL);
 }
 
 void AddSliderControl(HWND hwnd, SliderCreateStruct* scs){
-	CreateWindowA(TRACKBAR_CLASSA, "Trackbar Control", WS_CHILD | WS_VISIBLE | TBS_NOTICKS | TBS_BOTH | TBS_VERT | TBS_ENABLESELRANGE | TBS_FIXEDLENGTH, scs->x, scs->y, scs->sx, scs->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	DlgState* pDLG = GetWindowLongPtrA(hwnd, 0);
+	HWND hctrl = CreateWindowA(TRACKBAR_CLASSA, "Trackbar Control", WS_CHILD | WS_VISIBLE | TBS_NOTICKS | TBS_BOTH | TBS_VERT | TBS_ENABLESELRANGE | TBS_FIXEDLENGTH, scs->x, scs->y, scs->sx, scs->sy, hwnd, NULL, GetModuleHandle(NULL), NULL);
+	SendMessage(hctrl, TBM_SETRANGEMAX, 0, scs->peak);
+	AddControlItem(pDLG, hctrl, scs->id, DLG_SLIDER, NULL);
 }
 
 #define DlgFileCmd(cmd) if(strcmp(lineHeader, cmd) == 0)
 
 HWND LoadDialog(FILE* fp){
+	DlgState* pDLG = malloc(sizeof(DlgState));
+
 	TextCreateStruct tcs;
 	ButtonCreateStruct bcs;
 	ImageCreateStruct ics;
@@ -141,7 +174,7 @@ HWND LoadDialog(FILE* fp){
 		} else DlgFileCmd("CAPTION"){
 			ld_string(fp, instr);
 
-			hwnd = CreateWindowA("VBDIALOG", instr, WS_OVERLAPPED | WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, sX, sY, NULL, NULL, GetModuleHandle(NULL), NULL);
+			hwnd = CreateWindowA("VBDIALOG", instr, WS_OVERLAPPED | WS_MAXIMIZEBOX, CW_USEDEFAULT, CW_USEDEFAULT, sX, sY, NULL, NULL, GetModuleHandle(NULL), pDLG);
 		} else DlgFileCmd("SCRIPT"){
 			ld_string(fp, instr);
 			printf("Loading script %s\n", instr);
@@ -190,7 +223,7 @@ void InitDlgClass(){
 	wc.style = 0;
 	wc.lpfnWndProc = (WNDPROC)DialogWndProc;
 	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
+	wc.cbWndExtra = sizeof(DlgState*);
 	wc.hInstance = GetModuleHandle(NULL);
 	wc.hIcon = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1)); //101
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);

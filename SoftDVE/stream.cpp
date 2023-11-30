@@ -1,4 +1,5 @@
 #include "stream.h"
+#include "dlg.h"
 
 PStream StreamList[NUM_STREAMS];
 
@@ -37,11 +38,16 @@ void OutputFrame(PStream stream){
 	}
 }
 
-void DoRender(){
+void RepaintPreviews(DlgState* pDLG){
+	if(pDLG->type == DLG_IMAGE){
+		InvalidateRect(pDLG->hwnd, NULL, 0);
+	}
+}
+
+void DoRender(HWND hwndRoot){
 	EnumStreams(InvalidateBits);
 	EnumStreams(OutputFrame);
-
-	//invalidate rect
+	EnumDlgControls(GetWindowLongPtrA(hwndRoot, 0), RepaintPreviews);
 }
 
 void DrawPreview(PStream stream, PDRAWITEMSTRUCT pDIS){
@@ -81,4 +87,8 @@ PStream CreateStream(int sz, PStream_OutputFrame pFnFrame, PStream_ProcCmd pFnCm
 	stream->ProcCmd = pFnCmd;
 	AddStream(stream);
 	return stream;
+}
+
+void InitStreams(){
+	memset(StreamList, 0, sizeof(StreamList));
 }

@@ -4,6 +4,11 @@
 #include <windows.h>
 #include "stream.h"
 
+#define DLG_BUTTON 0
+#define DLG_TEXT 1
+#define DLG_IMAGE 2
+#define DLG_SLIDER 3
+
 typedef struct tagDlgState{
 	HWND hwnd;
 	int id;
@@ -13,8 +18,10 @@ typedef struct tagDlgState{
 	struct tagDlgState* next;
 } DlgState;
 
-//find control by hwnd
+typedef void (*DlgEnumerator)(DlgState*);
 
-//add item
+DlgState* FindControlByHwnd(DlgState* root, HWND hwnd);
+void AddControlItem(DlgState* root, HWND hwnd, int id, int type, int callback);
+void EnumDlgControls(DlgState* root, DlgEnumerator callback);
 
 #endif

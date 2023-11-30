@@ -32,8 +32,10 @@ void EnumStreams(StreamProc callback);
 
 void OutputFrame(PStream stream);
 
-void DoRender();
+void DoRender(HWND);
 
 extern PStream StreamList[NUM_STREAMS];
+
+void InitStreams();
 
 #endif
